@@ -16,7 +16,6 @@ common_names = set(['John', 'Mary', 'David'])
 
 class MEMM():
     def __init__(self):
-        # 动态获取当前脚本路径，确保路径正确
         self.train_path = "./data/train"
         self.dev_path = "./data/dev"
         self.beta = 0
@@ -70,9 +69,8 @@ class MEMM():
         print('Training classifier...')
         words, labels = self.load_data(self.train_path)
         previous_labels = ["O"] + labels
-        tagged_words = pos_tag(words)  # 对整个句子进行词性标注
+        tagged_words = pos_tag(words)  
 
-        # 使用 tqdm 显示特征提取进度
         features = [
             self.features(words, previous_labels[i], i, tagged_words=tagged_words)
             for i in tqdm(range(len(words)), desc="Extracting Features")
