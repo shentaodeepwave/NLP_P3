@@ -9,7 +9,7 @@
 # --------------------------------------------------
 
 import argparse
-from MEMM import MEMM
+from MEM2 import MEMM
 
 
 def main():
