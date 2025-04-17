@@ -124,10 +124,10 @@ class MEMM():
 
     def dump_model(self):
         """保存模型"""
-        with open('../model.pkl', 'wb') as f:
+        with open('./model.pkl', 'wb') as f:
             pickle.dump(self.classifier, f)
 
     def load_model(self):
         """加载模型"""
-        with open('../model.pkl', 'rb') as f:
+        with open('./model.pkl', 'rb') as f:
             self.classifier = pickle.load(f)
