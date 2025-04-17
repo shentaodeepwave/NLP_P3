@@ -11,8 +11,7 @@ from tqdm import tqdm
 # 下载 NLTK 所需的资源
 nltk.download('averaged_perceptron_tagger')
 
-# 常见名字集合
-common_names = set(['John', 'Mary', 'David'])
+import json
 
 class MEMM():
     def __init__(self):
@@ -21,7 +20,8 @@ class MEMM():
         self.beta = 0
         self.max_iter = 0
         self.classifier = None
-
+        with open('./common_names.json', 'r', encoding='utf-8') as f:
+            self.common_names = set(json.load(f).keys())
     def features(self, words, previous_label, position, tagged_words=None):
         """提取特征"""
         features = {}
@@ -42,7 +42,7 @@ class MEMM():
         # 使用缓存的词性标注结果
         if tagged_words:
             features[f'pos={tagged_words[position][1]}'] = 1
-        if current_word in common_names:
+        if current_word in self.common_names:
             features['is_common_name=1'] = 1
         features[f'length={len(current_word)}'] = 1
         if any(char.isdigit() for char in current_word):
