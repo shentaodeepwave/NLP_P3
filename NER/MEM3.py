@@ -127,10 +127,13 @@ class MEMM():
     
 
     def show_samples(self, bound):
-        """显示样本预测结果"""
+        """显示所有样本的预测结果"""
         sentences, sentence_labels = self.load_data(self.dev_path)
-        all_results = []
+        all_words = []
         all_labels = []
+        all_features = []
+
+        # 遍历所有句子，提取特征和标签
         for words, labels in zip(sentences, sentence_labels):
             previous_labels = ["O"] + labels
             tagged_words = pos_tag(words)  # 对句子进行词性标注
@@ -138,14 +141,16 @@ class MEMM():
                 self.features(words, previous_labels[i], i, tagged_words=tagged_words)
                 for i in range(len(words))
             ]
-            results = [self.classifier.classify(n) for n in features]
-            all_results.extend(results)
+            all_words.extend(words)
             all_labels.extend(labels)
+            all_features.extend(features)
 
+        # 获取指定范围的特征
         (m, n) = bound
-        pdists = self.classifier.prob_classify_many(features[m:n])
+        pdists = self.classifier.prob_classify_many(all_features[m:n])
+
         print('  Words          P(PERSON)  P(O)\n' + '-' * 40)
-        for (word, label, pdist) in list(zip(words, labels, pdists))[0:100]:
+        for (word, label, pdist) in zip(all_words[m:n], all_labels[m:n], pdists):
             if label == 'PERSON':
                 fmt = '  %-15s *%6.4f   %6.4f'
             else:
