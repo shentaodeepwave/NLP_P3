@@ -22,10 +22,16 @@ class MEMM():
         self.classifier = None
         with open('./common_names.json', 'r', encoding='utf-8') as f:
             self.common_names = set(json.load(f).keys())
+
     def features(self, words, previous_label, position, tagged_words=None):
         """提取特征"""
         features = {}
         current_word = words[position]
+        
+        # 确保 current_word 是字符串
+        if not isinstance(current_word, str):
+            current_word = str(current_word)
+        
         features['has_(%s)' % current_word] = 1
         features['prev_label'] = previous_label
         if current_word[0].isupper():
@@ -50,9 +56,11 @@ class MEMM():
         if any(not char.isalnum() for char in current_word):
             features['has_special_char=1'] = 1
         return features
-
+    
     def load_data(self, filename):
-        """加载数据"""
+        """加载数据并按句号分句"""
+        sentences = []
+        sentence_labels = []
         words = []
         labels = []
         with open(filename, "r", encoding="utf-8") as f:
@@ -60,62 +68,84 @@ class MEMM():
                 doublet = line.strip().split("\t")
                 if len(doublet) < 2:
                     continue
-                words.append(doublet[0])
-                labels.append(doublet[1])
-        return words, labels
+                word, label = doublet
+                words.append(word)
+                labels.append(label)
+                if word == "." or word == "?" or word == "!":
+                    # 遇到句号、问号或感叹号，保存当前句子并清空
+                    sentences.append(words)
+                    sentence_labels.append(labels)
+                    words = []
+                    labels = []
+            # 如果最后还有未保存的句子
+            if words:
+                sentences.append(words)
+                sentence_labels.append(labels)
+        return sentences, sentence_labels
 
     def train(self):
         """训练分类器"""
         print('Training classifier...')
-        words, labels = self.load_data(self.train_path)
-        previous_labels = ["O"] + labels
-        tagged_words = pos_tag(words)  
-
-        features = [
-            self.features(words, previous_labels[i], i, tagged_words=tagged_words)
-            for i in tqdm(range(len(words)), desc="Extracting Features")
-        ]
-
-        train_samples = [(f, l) for (f, l) in zip(features, labels)]
+        sentences, sentence_labels = self.load_data(self.train_path)
+        train_samples = []
+        for words, labels in zip(sentences, sentence_labels):
+            previous_labels = ["O"] + labels
+            tagged_words = pos_tag(words)  # 对句子进行词性标注
+            features = [
+                self.features(words, previous_labels[i], i, tagged_words=tagged_words)
+                for i in range(len(words))
+            ]
+            train_samples.extend([(f, l) for (f, l) in zip(features, labels)])
         classifier = MaxentClassifier.train(train_samples, max_iter=self.max_iter)
         self.classifier = classifier
 
     def test(self):
         """测试分类器"""
         print('Testing classifier...')
-        words, labels = self.load_data(self.dev_path)
-        previous_labels = ["O"] + labels
-        tagged_words = pos_tag(words)  # 对整个句子进行词性标注
-
-        features = [
-            self.features(words, previous_labels[i], i, tagged_words=tagged_words)
-            for i in range(len(words))
-        ]
-        results = [self.classifier.classify(n) for n in features]
+        sentences, sentence_labels = self.load_data(self.dev_path)
+        all_results = []
+        all_labels = []
+        for words, labels in zip(sentences, sentence_labels):
+            previous_labels = ["O"] + labels
+            tagged_words = pos_tag(words)  # 对句子进行词性标注
+            features = [
+                self.features(words, previous_labels[i], i, tagged_words=tagged_words)
+                for i in range(len(words))
+            ]
+            results = [self.classifier.classify(n) for n in features]
+            all_results.extend(results)
+            all_labels.extend(labels)
 
         # 计算评估指标
-        f_score = fbeta_score(labels, results, average='macro', beta=self.beta)
-        precision = precision_score(labels, results, average='macro')
-        recall = recall_score(labels, results, average='macro')
-        accuracy = accuracy_score(labels, results)
+        f_score = fbeta_score(all_labels, all_results, average='macro', beta=self.beta)
+        precision = precision_score(all_labels, all_results, average='macro')
+        recall = recall_score(all_labels, all_results, average='macro')
+        accuracy = accuracy_score(all_labels, all_results)
         print("%-15s %.4f\n%-15s %.4f\n%-15s %.4f\n%-15s %.4f\n" % (
             "f_score=", f_score, "accuracy=", accuracy, "recall=", recall, "precision=", precision))
         return True
+    
 
     def show_samples(self, bound):
         """显示样本预测结果"""
-        words, labels = self.load_data(self.train_path)
-        previous_labels = ["O"] + labels
-        tagged_words = pos_tag(words)  # 对整个句子进行词性标注
+        sentences, sentence_labels = self.load_data(self.dev_path)
+        all_results = []
+        all_labels = []
+        for words, labels in zip(sentences, sentence_labels):
+            previous_labels = ["O"] + labels
+            tagged_words = pos_tag(words)  # 对句子进行词性标注
+            features = [
+                self.features(words, previous_labels[i], i, tagged_words=tagged_words)
+                for i in range(len(words))
+            ]
+            results = [self.classifier.classify(n) for n in features]
+            all_results.extend(results)
+            all_labels.extend(labels)
 
-        features = [
-            self.features(words, previous_labels[i], i, tagged_words=tagged_words)
-            for i in range(len(words))
-        ]
         (m, n) = bound
         pdists = self.classifier.prob_classify_many(features[m:n])
         print('  Words          P(PERSON)  P(O)\n' + '-' * 40)
-        for (word, label, pdist) in list(zip(words, labels, pdists))[m:n]:
+        for (word, label, pdist) in list(zip(words, labels, pdists))[0:100]:
             if label == 'PERSON':
                 fmt = '  %-15s *%6.4f   %6.4f'
             else:
@@ -131,3 +161,32 @@ class MEMM():
         """加载模型"""
         with open('./model.pkl', 'rb') as f:
             self.classifier = pickle.load(f)
+
+    def predict_sentence(self, sentence):
+        """对输入的句子进行命名实体识别"""
+        words = sentence.split()  
+        previous_labels = ["O"]  
+        tagged_words = pos_tag(words)  # 对句子进行词性标注
+
+        features = []
+        results = []
+        named_entities = []
+
+        print("Step-by-step prediction process:")
+        for i in range(len(words)):
+            # 提取特征
+            feature = self.features(words, previous_labels[i], i, tagged_words=tagged_words)
+            features.append(feature)
+
+            # 分类
+            result = self.classifier.classify(feature)
+            results.append(result)
+            previous_labels.append(result)
+            print(f"Predicted Label: {result}\n")
+
+            # 如果是命名实体，添加到结果中
+            if result == "PERSON":
+                named_entities.append(words[i])
+
+        # 打印所有人名
+        print("Named Entities:", named_entities)

@@ -9,7 +9,7 @@
 # --------------------------------------------------
 
 import argparse
-from MEMM import MEMM
+from MEM2 import MEMM
 
 
 def main():
@@ -33,6 +33,11 @@ def main():
             classifier.show_samples(BOUND)
         except Exception as e:
             print(e)
+    if arg.example:
+
+        classifier.load_model()
+        sentence = input("Input:")
+        classifier.predict_sentence(sentence)
 
 
 if __name__ == '__main__':
@@ -41,6 +46,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--train', nargs='?', const=True, default=False)
     parser.add_argument('-d', '--dev', nargs='?', const=True, default=False)
     parser.add_argument('-s', '--show', nargs='?', const=True, default=False)
+    parser.add_argument('-e', '--example', nargs='?', const=True, default=False)
     arg = parser.parse_args()
 
     #====== Customization ======
