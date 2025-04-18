@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Named Entity Recognition</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        header {
+            background-color: #4CAF50;
+            color: white;
+            padding: 1rem 0;
+            text-align: center;
+        }
+        main {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 1rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        form {
+            margin-bottom: 2rem;
+        }
+        label {
+            font-weight: bold;
+        }
+        textarea {
+            width: 100%;
+            margin: 0.5rem 0;
+            padding: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        input[type="submit"] {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        input[type="submit"]:hover {
+            background-color: #45a049;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .word-box {
+            display: inline-block;
+            margin: 0 0.2rem 0.5rem 0.2rem; /* 增加下方间距 */
+            padding: 0.2rem 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .person {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Named Entity Recognition</h1>
+    </header>
+    <main>
+        <form action="/predict" method="post">
+            <label for="sentence">输入句子:</label><br>
+            <textarea id="sentence" name="sentence" rows="4" cols="50" placeholder="请输入句子...">{{ request.form.get('sentence', '') }}</textarea><br>
+            <input type="submit" value="预测">
+        </form>
+
+        {% if error %}
+            <p class="error">{{ error }}</p>
+        {% endif %}
+
+        {% if named_entities %}
+            <h2>识别结果:</h2>
+            <div>
+                {% for sentence_entities in named_entities %}
+                    <div>
+                        {% for word, is_person in sentence_entities %}
+                            <span class="word-box {% if is_person %}person{% endif %}">{{ word }}</span>
+                        {% endfor %}
+                    </div>
+                    <br> <!-- 强制换行 -->
+                {% endfor %}
+            </div>
+        {% endif %}
+    </main>
+</body>
+</html>

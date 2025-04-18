@@ -7,6 +7,10 @@ import nltk
 import pickle
 from nltk import pos_tag
 from tqdm import tqdm
+from nltk.tokenize import word_tokenize
+from string import punctuation
+from nltk.tokenize import sent_tokenize  # 添加分句所需的模块
+nltk.download('punkt')
 
 # 下载 NLTK 所需的资源
 nltk.download('averaged_perceptron_tagger')
@@ -167,32 +171,43 @@ class MEMM():
         with open('./model.pkl', 'rb') as f:
             self.classifier = pickle.load(f)
 
-    def predict_sentence(self, sentence):
-        """对输入的句子进行命名实体识别"""
-        words = sentence.split()  
-        previous_labels = ["O"]  
-        tagged_words = pos_tag(words)  # 对句子进行词性标注
 
-        features = []
-        results = []
-        named_entities = []
+
+    def predict_sentence(self, text):
+        """对输入的文本进行命名实体识别，支持多句子"""
+        sentences = sent_tokenize(text)  # 分句
+        all_named_entities = []
 
         print("Step-by-step prediction process:")
-        for i in range(len(words)):
-            # 提取特征
-            feature = self.features(words, previous_labels[i], i, tagged_words=tagged_words)
-            features.append(feature)
+        for sentence in sentences:
+            words = word_tokenize(sentence)  # 使用 NLTK 的 word_tokenize 进行分词
+            previous_labels = ["O"]
+            tagged_words = pos_tag(words)  # 对句子进行词性标注
 
-            # 分类
-            result = self.classifier.classify(feature)
-            results.append(result)
-            previous_labels.append(result)
-            print(f"Predicted Label: {result}\n")
+            features = []
+            results = []
+            named_entities = []
 
-            # 如果是命名实体，添加到结果中
-            if result == "PERSON":
-                named_entities.append(words[i])
+            for i in range(len(words)):
+                # 提取特征
+                feature = self.features(words, previous_labels[i], i, tagged_words=tagged_words)
+                features.append(feature)
 
-        # 打印所有人名
-        print("Named Entities:", named_entities)
-        return named_entities
+                # 分类
+                result = self.classifier.classify(feature)
+                results.append(result)
+                previous_labels.append(result)
+
+                # 如果是命名实体，添加到结果中
+                is_person = result == "PERSON"
+                named_entities.append((words[i], is_person))
+
+            # 打印当前句子的人名
+            print(f"Sentence: {sentence}")
+            print("Named Entities:", [word for word, is_person in named_entities if is_person])
+
+            # 保存当前句子的命名实体结果
+            all_named_entities.append(named_entities)
+
+        return all_named_entities
+    
