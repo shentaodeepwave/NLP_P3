@@ -195,3 +195,4 @@ class MEMM():
 
         # 打印所有人名
         print("Named Entities:", named_entities)
+        return named_entities
