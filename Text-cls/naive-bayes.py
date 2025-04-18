@@ -6,6 +6,12 @@ import nltk
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 import string
+import os
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def get_absolute_path(relative_path):
+    """将相对路径转换为绝对路径"""
+    return os.path.join(ROOT_DIR, relative_path)
 
 def preprocess(inputfile, outputfile):
     #TODO: preprocess the input file, and output the result to the output file: train.preprocessed.json,test.preprocessed.json
@@ -16,6 +22,8 @@ def preprocess(inputfile, outputfile):
     nltk.download('punkt')
     stemmer = PorterStemmer()
     translator = str.maketrans('', '', string.punctuation)
+    inputfile = get_absolute_path(inputfile)
+    outputfile = get_absolute_path(outputfile)
 
     with open(inputfile, 'r') as infile:
         data = json.load(infile)
@@ -40,6 +48,9 @@ def preprocess(inputfile, outputfile):
 def count_word(inputfile,outputfile):
     #TODO: count the words from the corpus, and output the result to the output file in the format required.
     #   A dictionary object may help you with this work.
+    inputfile = get_absolute_path(inputfile)
+    outputfile = get_absolute_path(outputfile)
+
     with open(inputfile, 'r') as infile:
         data = json.load(infile)
     
@@ -65,6 +76,8 @@ def feature_selection(inputfile,threshold,outputfile):
     # Use the frequency obtained in 'word_count.txt' to calculate the total word frequency in each class.
     #   Notice that when calculating the word frequency, only words recognized as features are taken into consideration.
     # Output the result to the output file in the format required
+    inputfile = get_absolute_path(inputfile)
+    outputfile = get_absolute_path(outputfile)
     with open(inputfile, 'r') as infile:
         lines = infile.readlines()
     
@@ -87,6 +100,10 @@ def feature_selection(inputfile,threshold,outputfile):
             outfile.write(f"{word} {' '.join(map(str, counts))}\n")
 
 def calculate_probability(word_count, word_dict, outputfile):
+    word_count = get_absolute_path(word_count)
+    word_dict = get_absolute_path(word_dict)
+    outputfile = get_absolute_path(outputfile)
+
     with open(word_count, 'r') as wc_file, open(word_dict, 'r') as wd_file:
         wc_lines = wc_file.readlines()
         wd_lines = wd_file.readlines()
@@ -120,6 +137,11 @@ def calculate_probability(word_count, word_dict, outputfile):
 def classify(probability,testset,outputfile):
     #TODO: Implement the naïve Bayes classifier to assign class labels to the documents in the test set.
     #   Output the result to the output file in the format required
+
+    probability = get_absolute_path(probability)
+    testset = get_absolute_path(testset)
+    outputfile = get_absolute_path(outputfile)
+
     with open(probability, 'r') as prob_file, open(testset, 'r') as test_file:
         prob_lines = prob_file.readlines()
         test_data = json.load(test_file)
@@ -150,6 +172,10 @@ def classify(probability,testset,outputfile):
 def f1_score(testset,classification_result):
     #TODO: Use the F_1 score to assess the performance of the implemented classification model
     #   The return value should be a float object.
+
+    testset = get_absolute_path(testset)
+    classification_result = get_absolute_path(classification_result)
+    # Load the test set and classification result
     with open(testset, 'r') as test_file, open(classification_result, 'r') as result_file:
         test_data = json.load(test_file)
         results = result_file.readlines()
@@ -179,49 +205,75 @@ def f1_score(testset,classification_result):
 
     return sum(f1_scores) / len(f1_scores)
 
+def accuracy_score(testset, classification_result):
+    """计算分类模型的准确率"""
+    testset = get_absolute_path(testset)
+    classification_result = get_absolute_path(classification_result)
+
+    # 加载测试集和分类结果
+    with open(testset, 'r') as test_file, open(classification_result, 'r') as result_file:
+        test_data = json.load(test_file)
+        results = result_file.readlines()
+
+    true_labels = {doc[0]: doc[1] for doc in test_data}
+    predicted_labels = {line.split()[0]: line.split()[1] for line in results}
+
+    correct_predictions = sum(1 for file_id in true_labels if true_labels[file_id] == predicted_labels.get(file_id, None))
+    total_predictions = len(true_labels)
+
+    return correct_predictions / total_predictions if total_predictions > 0 else 0
+
 def main():
     ''' Main Function '''
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-pps', '--preprocess',type=str,nargs=2,help='preprocess the dataset')
-    parser.add_argument('-cw','--count_word',type=str,nargs=2,help='count the words from the corpus')
-    parser.add_argument('-fs','--feature_selection',type=str,nargs=3,help='\select the features from the corpus')
-    parser.add_argument('-cp','--calculate_probability',type=str,nargs=3,
+    parser.add_argument('-pps', '--preprocess', type=str, nargs=2, help='preprocess the dataset')
+    parser.add_argument('-cw', '--count_word', type=str, nargs=2, help='count the words from the corpus')
+    parser.add_argument('-fs', '--feature_selection', type=str, nargs=3, help='select the features from the corpus')
+    parser.add_argument('-cp', '--calculate_probability', type=str, nargs=3,
                         help='calculate the posterior probability of each feature word, and the prior probability of the class')
-    parser.add_argument('-cl','--classify',type=str,nargs=3,
+    parser.add_argument('-cl', '--classify', type=str, nargs=3,
                         help='classify the testset documents based on the probability calculated')
-    parser.add_argument('-f1','--f1_score', type=str, nargs=2,
+    parser.add_argument('-f1', '--f1_score', type=str, nargs=2,
                         help='calculate the F-1 score based on the classification result.')
-    opt=parser.parse_args()
+    parser.add_argument('-acc', '--accuracy', type=str, nargs=2,
+                        help='calculate the accuracy of the classification result.')
 
-    if(opt.preprocess):
+    opt = parser.parse_args()
+
+    if opt.preprocess:
         input_file = opt.preprocess[0]
         output_file = opt.preprocess[1]
-        preprocess(input_file,output_file)
-    elif(opt.count_word):
+        preprocess(input_file, output_file)
+    elif opt.count_word:
         input_file = opt.count_word[0]
         output_file = opt.count_word[1]
-        count_word(input_file,output_file)
-    elif(opt.feature_selection):
+        count_word(input_file, output_file)
+    elif opt.feature_selection:
         input_file = opt.feature_selection[0]
         threshold = int(opt.feature_selection[1])
         outputfile = opt.feature_selection[2]
-        feature_selection(input_file,threshold,outputfile)
-    elif(opt.calculate_probability):
+        feature_selection(input_file, threshold, outputfile)
+    elif opt.calculate_probability:
         word_count = opt.calculate_probability[0]
         word_dict = opt.calculate_probability[1]
         output_file = opt.calculate_probability[2]
-        calculate_probability(word_count,word_dict,output_file)
-    elif(opt.classify):
+        calculate_probability(word_count, word_dict, output_file)
+    elif opt.classify:
         probability = opt.classify[0]
         testset = opt.classify[1]
         outputfile = opt.classify[2]
-        classify(probability,testset,outputfile)
-    elif(opt.f1_score):
+        classify(probability, testset, outputfile)
+    elif opt.f1_score:
         testset = opt.f1_score[0]
         classification_result = opt.f1_score[1]
-        f1 = f1_score(testset,classification_result)
-        print('The F1 score of the classification result is: '+str(f1))
+        f1 = f1_score(testset, classification_result)
+        print('The F1 score of the classification result is: ' + str(f1))
+    elif opt.accuracy:
+        testset = opt.accuracy[0]
+        classification_result = opt.accuracy[1]
+        accuracy = accuracy_score(testset, classification_result)
+        print('The accuracy of the classification result is: ' + str(accuracy))
 
 
 if __name__ == '__main__':
