@@ -13,9 +13,7 @@ from MEM3 import MEMM
 
 
 def main():
-
     classifier = MEMM()
-
     if arg.train:
         classifier.max_iter = MAX_ITER
         classifier.train()
