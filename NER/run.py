@@ -9,7 +9,7 @@
 # --------------------------------------------------
 
 import argparse
-from MEM3 import MEMM
+from MEM4 import MEMM
 
 
 def main():
@@ -49,8 +49,7 @@ if __name__ == '__main__':
 
     #====== Customization ======
     BETA = 0.5
-    MAX_ITER = 5
+    MAX_ITER = 20
     BOUND = (0, 20)
     #==========================
-
     main()

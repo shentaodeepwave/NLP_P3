@@ -28,7 +28,7 @@ class MEMM():
             self.common_names = set(json.load(f).keys())
 
     def features(self, words, previous_label, position, tagged_words=None):
-        """提取特征"""
+        """改进的特征提取"""
         features = {}
         current_word = words[position]
 
@@ -36,63 +36,144 @@ class MEMM():
         if not isinstance(current_word, str):
             current_word = str(current_word)
 
-        # 当前单词特征
-        features['has_(%s)' % current_word] = 1
-        features['prev_label'] = previous_label
-        if current_word[0].isupper():
-            features['case=Title'] = 1
-        if current_word.isupper():
-            features['case=ALLCAP'] = 1
-        if "'" in current_word:
-            features['format=Apostrophe'] = 1
-        features[f'length={len(current_word)}'] = 1
-        if any(char.isdigit() for char in current_word):
-            features['has_digit=1'] = 1
-        if any(not char.isalnum() for char in current_word):
-            features['has_special_char=1'] = 1
-        if current_word in self.common_names:
-            features['is_common_name=1'] = 1
+        # 当前单词的基本特征
+        features['word.isupper'] = current_word.isupper()  # 是否全大写
+        features['word.istitle'] = current_word.istitle()  # 是否首字母大写
+        features['word.isdigit'] = current_word.isdigit()  # 是否是数字
+        features['word.isalpha'] = current_word.isalpha()   # 是否是字母
+        features['word.numeric'] = current_word.isnumeric()  # 是否是数字
+
+        features['word.length'] = len(current_word)  # 单词长度
+
+        features['word.has_digit'] = any(char.isdigit() for char in current_word)  # 是否包含数字
+        features['word.has_special_char'] = any(not char.isalnum() for char in current_word)  # 是否包含标点符号
+        features['word.has_Apostrophe'] = "'" in current_word  # 是否包含撇号
+    
+        # 是否是常见名字
+        features['is_common_name'] = current_word in self.common_names
 
         # 上下文单词特征
-        n = 1
         if position > 0:
-            features[f'prev_{n}_word={words[position - 1]}'] = 1
+            prev_word = words[position - 1]
+            features['prev_word.lower'] = prev_word.lower() # 前一个单词的小写形式
+            features['prev_word.istitle'] = prev_word.istitle() #  前一个单词的首字母是否大写
+            features['prev_word.isupper'] = prev_word.isupper() # 前一个单词是否全大写
+        else:
+            features['BOS'] = True  # 句子开头
+
         if position < len(words) - 1:
-            features[f'next_{n}_word={words[position + 1]}'] = 1
+            next_word = words[position + 1]
+            features['next_word.lower'] = next_word.lower() # 后一个单词的小写形式
+            features['next_word.istitle'] = next_word.istitle() # 后一个单词的首字母是否大写
+            features['next_word.isupper'] = next_word.isupper() # 后一个单词是否全大写
+            # 检测后一个单词是否是结束句子的标点符号
+            features['next_word.is_end_punctuation'] = next_word in {'.', '?', '!'}
+        else:
+            features['EOS'] = True  # 句子结尾
 
-        # 前后多个单词的词性特征
-        if tagged_words:
-            # 当前单词的词性
-            features[f'pos={tagged_words[position][1]}'] = 1
-
-            # 前一个单词的词性
-            if position > 0:
-                features[f'prev_{n}_pos={tagged_words[position - 1][1]}'] = 1
-
-            # 后一个单词的词性
-            if position < len(tagged_words) - 1:
-                features[f'next_{n}_pos={tagged_words[position + 1][1]}'] = 1
-
-            # 前两个单词的词性
-            if position > 1:
-                features[f'prev_{n+1}_pos={tagged_words[position - 2][1]}'] = 1
-
-            # 后两个单词的词性
-            if position < len(tagged_words) - 2:
-                features[f'next_{n+1}_pos={tagged_words[position + 2][1]}'] = 1
-
-        # 前后多个单词的表面特征
-        if position > 1:
-            features[f'prev_{n+1}_word={words[position - 2]}'] = 1
-        if position < len(words) - 2:
-            features[f'next_{n+1}_word={words[position + 2]}'] = 1
-
-        # 前后单词的组合特征
+        # 前后多个单词的组合特征
         if position > 0 and position < len(words) - 1:
-            features[f'prev_next_word_comb={words[position - 1]}_{words[position + 1]}'] = 1
+            features['prev_next_word_comb'] = f"{words[position - 1].lower()}_{words[position + 1].lower()}"
+
+        # 词性特征
+        if tagged_words:
+            features['pos'] = tagged_words[position][1]  # 当前单词的词性
+            if position > 0:
+                features['prev_pos'] = tagged_words[position - 1][1]  # 前一个单词的词性
+            if position < len(tagged_words) - 1:
+                features['next_pos'] = tagged_words[position + 1][1]  # 后一个单词的词性
+
+        # 字符模式特征
+        if current_word.isalpha(): 
+            features['is_alpha'] = True
+        if current_word.isnumeric(): #
+            features['is_numeric'] = True
+        if "-" in current_word:
+            features['has_hyphen'] = True
+
+        # 前后窗口特征
+        window_size = 2
+        for i in range(1, window_size + 1):
+            if position - i >= 0:
+                features[f'prev_{i}_word'] = words[position - i].lower()
+            if position + i < len(words):
+                features[f'next_{i}_word'] = words[position + i].lower()
+
+        # 前一个标签
+        features['prev_label'] = previous_label
 
         return features
-    
+    def features(self, words, previous_label, position, tagged_words=None):
+        """改进的特征提取"""
+        features = {}
+        current_word = words[position]
+
+        # 确保 current_word 是字符串
+        if not isinstance(current_word, str):
+            current_word = str(current_word)
+
+        # 当前单词的基本特征
+        features['word.lower'] = current_word.lower()  # 小写形式
+        
+        features['word.isupper'] = current_word.isupper()  # 是否全大写
+        features['word.istitle'] = current_word.istitle()  # 是否首字母大写
+        features['word.isdigit'] = current_word.isdigit()  # 是否是数字
+        features['word.isalpha'] = current_word.isalpha()   # 是否是字母
+        features['word.numeric'] = current_word.isnumeric()  # 是否是数字
+        features['word.length'] = len(current_word)  # 单词长度
+        features['word.has_digit'] = any(char.isdigit() for char in current_word)  # 是否包含数字
+        features['word.has_special_char'] = any(not char.isalnum() for char in current_word)  # 是否包含标点符号
+        features['word.has_Apostrophe'] = "'" in current_word  # 是否包含撇号
+        features['word.has_hyphen'] = "-" in current_word  # 是否包含连字符
+        features['word.suffix'] = current_word[-3:] if len(current_word) > 2 else current_word  # 后缀
+        features['word.prefix'] = current_word[:3] if len(current_word) > 2 else current_word  # 前缀
+
+        # 是否是常见名字
+        features['is_common_name'] = current_word in self.common_names
+
+        # 上下文单词特征
+        if position > 0:
+            prev_word = words[position - 1]
+            features['prev_word.lower'] = prev_word.lower()
+            features['prev_word.istitle'] = prev_word.istitle()
+            features['prev_word.isupper'] = prev_word.isupper()
+        else:
+            features['BOS'] = True  # 句子开头
+
+        if position < len(words) - 1:
+            next_word = words[position + 1]
+            features['next_word.lower'] = next_word.lower()
+            features['next_word.istitle'] = next_word.istitle()
+            features['next_word.isupper'] = next_word.isupper()
+            features['next_word.is_end_punctuation'] = next_word in {'.', '?', '!'}  # 检测后一个单词是否是结束句子的标点符号
+        else:
+            features['EOS'] = True  # 句子结尾
+
+        # 前后多个单词的组合特征
+        if position > 0 and position < len(words) - 1:
+            features['prev_next_word_comb'] = f"{words[position - 1].lower()}_{words[position + 1].lower()}"
+
+        # 词性特征
+        if tagged_words:
+            features['pos'] = tagged_words[position][1]  # 当前单词的词性
+            if position > 0:
+                features['prev_pos'] = tagged_words[position - 1][1]  # 前一个单词的词性
+            if position < len(tagged_words) - 1:
+                features['next_pos'] = tagged_words[position + 1][1]  # 后一个单词的词性
+
+
+        # 前后窗口特征
+        window_size = 2
+        for i in range(1, window_size + 1):
+            if position - i >= 0:
+                features[f'prev_{i}_word'] = words[position - i].lower()
+            if position + i < len(words):
+                features[f'next_{i}_word'] = words[position + i].lower()
+
+        # 前一个标签
+        features['prev_label'] = previous_label
+
+        return features
     def load_data(self, filename):
         """加载数据并按句号分句"""
         sentences = []

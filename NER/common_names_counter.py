@@ -24,7 +24,7 @@ def count_common_names(filename, top_n=100):
     for word, label in zip(words, labels):
         if label == "PERSON":
             name_counter[word] += 1
-
+    print(f"统计到 {len(name_counter)} 个名字")
     # 获取最常见的前 top_n 个人名
     most_common_names = name_counter.most_common(top_n)
     return most_common_names
@@ -35,7 +35,7 @@ def save_common_names_to_json(common_names, output_file):
         json.dump(dict(common_names), f, ensure_ascii=False, indent=4)
 
 if __name__ == "__main__":
-    # 替换为你的训练数据路径
+
     train_data_path = "./data/train"
     output_file = "./common_names.json"
     top_n = 100
