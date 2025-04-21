@@ -17,9 +17,11 @@ from Text_cls.naive_bayes import preprocess_text,classify1
 def index():
 
     text,preprocess,label = preprocess_text()
-    #只取文本
-    
-    return render_template('index.html', named_entities=None, random_texts=text, classification_result=None)
+    return render_template('index.html', 
+                           named_entities=None, 
+                           random_texts=text, 
+                           classification_result=None
+                           )
 
 
 
@@ -31,7 +33,11 @@ def predict():
         sentence = request.form.get('sentence')
         text, preprocess, label = preprocess_text()
         if not sentence:
-            return render_template('index.html', error="输入句子为空", named_entities=None, random_texts=text, classification_result=None)
+            return render_template('index.html', 
+                                    error="NULL", 
+                                    named_entities=None, 
+                                    random_texts=text, 
+                                    classification_result=None)
 
         probability_file = './Text_cls/word_probability.txt'
         classification_result, scores = classify1(probability_file, sentence)
@@ -44,14 +50,17 @@ def predict():
             named_entities=named_entities,
             error=None,
             random_texts=text,
-            classification_result=[f"分类结果: {classification_result}"],
+            classification_result=[f"RESULT: {classification_result}"],
             scores=scores,
             categories=categories
         )
     except Exception as e:
         print(f"Error occurred: {e}")
         text, preprocess, label = preprocess_text()
-        return render_template('index.html', error=f"Error: {str(e)}", named_entities=None, random_texts=text, classification_result=None)
+        return render_template('index.html', error=f"Error: {str(e)}", 
+                               named_entities=None, 
+                               random_texts=text, 
+                               classification_result=None)
 
 if __name__ == '__main__':
     app.run(debug=True)

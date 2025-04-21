@@ -82,10 +82,9 @@
             background-color: #f9f9f9;
         }
         .person {
-       
-            border: 2px solid red;    /* 红色边框 */
-            font-weight: bold;        /* 加粗字体 */
-            color: blue;             /* 黑色字体 */
+            border: 2px solid red;    /* Red border */
+            font-weight: bold;        /* Bold font */
+            color: blue;              /* Blue text */
         }
         #chart-container {
             margin-top: 2rem;
@@ -98,7 +97,7 @@
         }
 
         function drag(event) {
-            const text = event.target.textContent.trim(); // 去除多余空白
+            const text = event.target.textContent.trim(); // Remove extra spaces
             event.dataTransfer.setData("text", text);
         }
 
@@ -116,7 +115,7 @@
                 data: {
                     labels: categories,
                     datasets: [{
-                        label: '分类得分',
+                        label: 'Classification Scores',
                         data: scores,
                         backgroundColor: ['#4CAF50', '#2196F3', '#FFC107', '#FF5722'],
                         borderColor: ['#388E3C', '#1976D2', '#FFA000', '#D84315'],
@@ -136,7 +135,7 @@
 </head>
 <body>
     <aside>
-        <h2>随机文本</h2>
+        <h2>Random Text</h2>
         {% for text in random_texts %}
             <div class="draggable" draggable="true" ondragstart="drag(event)">
                 {{ text }}
@@ -145,9 +144,9 @@
     </aside>
     <main>
         <form action="/predict" method="post">
-            <label for="sentence">输入句子:</label><br>
-            <textarea id="sentence" name="sentence" rows="4" cols="50" placeholder="请输入句子..." ondrop="drop(event)" ondragover="allowDrop(event)">{{ request.form.get('sentence', '') }}</textarea><br>
-            <input type="submit" value="预测">
+            <label for="sentence">Input Sentence:</label><br>
+            <textarea id="sentence" name="sentence" rows="4" cols="50" placeholder="Enter a sentence..." ondrop="drop(event)" ondragover="allowDrop(event)">{{ request.form.get('sentence', '') }}</textarea><br>
+            <input type="submit" value="Predict">
         </form>
 
         {% if error %}
@@ -155,7 +154,7 @@
         {% endif %}
 
         {% if named_entities %}
-            <h2>识别结果:</h2>
+            <h2>Recognition Results:</h2>
             <div>
                 {% for sentence_entities in named_entities %}
                     <div>
@@ -172,7 +171,7 @@
         {% endif %}
 
         {% if classification_result %}
-            <h2>文本分类结果:</h2>
+            <h2>Text Classification Results:</h2>
             <ul>
                 {% for result in classification_result %}
                     <li>{{ result }}</li>
@@ -182,7 +181,7 @@
 
         {% if scores and categories %}
             <div id="chart-container">
-                <h2>分类得分比较</h2>
+                <h2>Classification Score Comparison</h2>
                 <canvas id="classificationChart"></canvas>
                 <script>
                     const categories = {{ categories | tojson }};
