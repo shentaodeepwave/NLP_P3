@@ -25,8 +25,19 @@ def count_common_names(filename, top_n=100):
         if label == "PERSON":
             name_counter[word] += 1
     print(f"统计到 {len(name_counter)} 个名字")
+    
     # 获取最常见的前 top_n 个人名
     most_common_names = name_counter.most_common(top_n)
+    
+    # 计算前 top_n 名字的总出现次数
+    top_n_count = sum(count for _, count in most_common_names)
+    # 计算所有人名的总出现次数
+    total_count = sum(name_counter.values())
+    
+    # 计算比例
+    percentage = (top_n_count / total_count) * 100
+    print(f"前 {top_n} 个名字的出现次数占总人名数的比例为: {percentage:.2f}%")
+    
     return most_common_names
 
 def save_common_names_to_json(common_names, output_file):
@@ -38,7 +49,7 @@ if __name__ == "__main__":
 
     train_data_path = "./data/train"
     output_file = "./common_names.json"
-    top_n = 100
+    top_n = 1000
 
     common_names = count_common_names(train_data_path, top_n)
     save_common_names_to_json(common_names, output_file)

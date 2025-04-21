@@ -82,17 +82,24 @@
             background-color: #f9f9f9;
         }
         .person {
-            color: red;
-            font-weight: bold;
+       
+            border: 2px solid red;    /* 红色边框 */
+            font-weight: bold;        /* 加粗字体 */
+            color: blue;             /* 黑色字体 */
+        }
+        #chart-container {
+            margin-top: 2rem;
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         function allowDrop(event) {
             event.preventDefault();
         }
 
         function drag(event) {
-            event.dataTransfer.setData("text", event.target.textContent);
+            const text = event.target.textContent.trim(); // 去除多余空白
+            event.dataTransfer.setData("text", text);
         }
 
         function drop(event) {
@@ -100,6 +107,30 @@
             const data = event.dataTransfer.getData("text");
             const textarea = document.getElementById("sentence");
             textarea.value = data;
+        }
+
+        function renderChart(categories, scores) {
+            const ctx = document.getElementById('classificationChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: categories,
+                    datasets: [{
+                        label: '分类得分',
+                        data: scores,
+                        backgroundColor: ['#4CAF50', '#2196F3', '#FFC107', '#FF5722'],
+                        borderColor: ['#388E3C', '#1976D2', '#FFA000', '#D84315'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
         }
     </script>
 </head>
@@ -128,8 +159,11 @@
             <div>
                 {% for sentence_entities in named_entities %}
                     <div>
-                        {% for word, is_person in sentence_entities %}
-                            <span class="word-box {% if is_person %}person{% endif %}">{{ word }}</span>
+                        {% for entity in sentence_entities %}
+                        <span class="word-box {% if entity.is_person %} person{% endif %}" 
+                            style="background-color: rgba(0, 255, 0, {{ entity.prob_person | float}});">
+                            {{ entity.word }}
+                        </span>
                         {% endfor %}
                     </div>
                     <br>
@@ -144,6 +178,18 @@
                     <li>{{ result }}</li>
                 {% endfor %}
             </ul>
+        {% endif %}
+
+        {% if scores and categories %}
+            <div id="chart-container">
+                <h2>分类得分比较</h2>
+                <canvas id="classificationChart"></canvas>
+                <script>
+                    const categories = {{ categories | tojson }};
+                    const scores = {{ scores | tojson }};
+                    renderChart(categories, scores);
+                </script>
+            </div>
         {% endif %}
     </main>
 </body>

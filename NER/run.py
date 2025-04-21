@@ -1,16 +1,5 @@
-#!/usr/bin/env python3
-# -*- coding:utf-8 -*-
-# --------------------------------------------------
-# Description:
-# --------------------------------------------------
-# Author: Du-Haihua <mb75481@um.edu.mo>
-# Created Date : April 3rd 2020, 12:05:49
-# Last Modified: April 4th 2020, 10:59:35
-# --------------------------------------------------
-
 import argparse
 from MEM4 import MEMM
-
 
 def main():
     classifier = MEMM()
@@ -37,7 +26,6 @@ def main():
         sentence = input("Input:")
         classifier.predict_sentence(sentence)
 
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
@@ -49,7 +37,7 @@ if __name__ == '__main__':
 
     #====== Customization ======
     BETA = 0.5
-    MAX_ITER = 20
-    BOUND = (0, 20)
-    #==========================
+    MAX_ITER = 50
+    BOUND = (300, 400)
+    #==========================S
     main()

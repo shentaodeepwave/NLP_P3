@@ -8,7 +8,7 @@ import pickle
 from nltk import pos_tag
 from tqdm import tqdm
 from nltk.tokenize import word_tokenize
-from string import punctuation
+from concurrent.futures import ThreadPoolExecutor
 from nltk.tokenize import sent_tokenize  # 添加分句所需的模块
 nltk.download('punkt')
 
@@ -39,92 +39,11 @@ class MEMM():
         # 当前单词的基本特征
         features['word.isupper'] = current_word.isupper()  # 是否全大写
         features['word.istitle'] = current_word.istitle()  # 是否首字母大写
-        features['word.isdigit'] = current_word.isdigit()  # 是否是数字
-        features['word.isalpha'] = current_word.isalpha()   # 是否是字母
-        features['word.numeric'] = current_word.isnumeric()  # 是否是数字
-
-        features['word.length'] = len(current_word)  # 单词长度
-
-        features['word.has_digit'] = any(char.isdigit() for char in current_word)  # 是否包含数字
-        features['word.has_special_char'] = any(not char.isalnum() for char in current_word)  # 是否包含标点符号
-        features['word.has_Apostrophe'] = "'" in current_word  # 是否包含撇号
-    
-        # 是否是常见名字
-        features['is_common_name'] = current_word in self.common_names
-
-        # 上下文单词特征
-        if position > 0:
-            prev_word = words[position - 1]
-            features['prev_word.lower'] = prev_word.lower() # 前一个单词的小写形式
-            features['prev_word.istitle'] = prev_word.istitle() #  前一个单词的首字母是否大写
-            features['prev_word.isupper'] = prev_word.isupper() # 前一个单词是否全大写
-        else:
-            features['BOS'] = True  # 句子开头
-
-        if position < len(words) - 1:
-            next_word = words[position + 1]
-            features['next_word.lower'] = next_word.lower() # 后一个单词的小写形式
-            features['next_word.istitle'] = next_word.istitle() # 后一个单词的首字母是否大写
-            features['next_word.isupper'] = next_word.isupper() # 后一个单词是否全大写
-            # 检测后一个单词是否是结束句子的标点符号
-            features['next_word.is_end_punctuation'] = next_word in {'.', '?', '!'}
-        else:
-            features['EOS'] = True  # 句子结尾
-
-        # 前后多个单词的组合特征
-        if position > 0 and position < len(words) - 1:
-            features['prev_next_word_comb'] = f"{words[position - 1].lower()}_{words[position + 1].lower()}"
-
-        # 词性特征
-        if tagged_words:
-            features['pos'] = tagged_words[position][1]  # 当前单词的词性
-            if position > 0:
-                features['prev_pos'] = tagged_words[position - 1][1]  # 前一个单词的词性
-            if position < len(tagged_words) - 1:
-                features['next_pos'] = tagged_words[position + 1][1]  # 后一个单词的词性
-
-        # 字符模式特征
-        if current_word.isalpha(): 
-            features['is_alpha'] = True
-        if current_word.isnumeric(): #
-            features['is_numeric'] = True
-        if "-" in current_word:
-            features['has_hyphen'] = True
-
-        # 前后窗口特征
-        window_size = 2
-        for i in range(1, window_size + 1):
-            if position - i >= 0:
-                features[f'prev_{i}_word'] = words[position - i].lower()
-            if position + i < len(words):
-                features[f'next_{i}_word'] = words[position + i].lower()
-
-        # 前一个标签
-        features['prev_label'] = previous_label
-
-        return features
-    def features(self, words, previous_label, position, tagged_words=None):
-        """改进的特征提取"""
-        features = {}
-        current_word = words[position]
-
-        # 确保 current_word 是字符串
-        if not isinstance(current_word, str):
-            current_word = str(current_word)
-
-        # 当前单词的基本特征
-        features['word.lower'] = current_word.lower()  # 小写形式
-        
-        features['word.isupper'] = current_word.isupper()  # 是否全大写
-        features['word.istitle'] = current_word.istitle()  # 是否首字母大写
-        features['word.isdigit'] = current_word.isdigit()  # 是否是数字
         features['word.isalpha'] = current_word.isalpha()   # 是否是字母
         features['word.numeric'] = current_word.isnumeric()  # 是否是数字
         features['word.length'] = len(current_word)  # 单词长度
         features['word.has_digit'] = any(char.isdigit() for char in current_word)  # 是否包含数字
         features['word.has_special_char'] = any(not char.isalnum() for char in current_word)  # 是否包含标点符号
-        features['word.has_Apostrophe'] = "'" in current_word  # 是否包含撇号
-        features['word.has_hyphen'] = "-" in current_word  # 是否包含连字符
         features['word.suffix'] = current_word[-3:] if len(current_word) > 2 else current_word  # 后缀
         features['word.prefix'] = current_word[:3] if len(current_word) > 2 else current_word  # 前缀
 
@@ -134,24 +53,20 @@ class MEMM():
         # 上下文单词特征
         if position > 0:
             prev_word = words[position - 1]
-            features['prev_word.lower'] = prev_word.lower()
             features['prev_word.istitle'] = prev_word.istitle()
             features['prev_word.isupper'] = prev_word.isupper()
+            features['prev_word.isalpha'] = prev_word.isalpha()
         else:
             features['BOS'] = True  # 句子开头
 
         if position < len(words) - 1:
             next_word = words[position + 1]
-            features['next_word.lower'] = next_word.lower()
             features['next_word.istitle'] = next_word.istitle()
             features['next_word.isupper'] = next_word.isupper()
+            features['next_word.isalpha'] = next_word.isalpha()
             features['next_word.is_end_punctuation'] = next_word in {'.', '?', '!'}  # 检测后一个单词是否是结束句子的标点符号
         else:
             features['EOS'] = True  # 句子结尾
-
-        # 前后多个单词的组合特征
-        if position > 0 and position < len(words) - 1:
-            features['prev_next_word_comb'] = f"{words[position - 1].lower()}_{words[position + 1].lower()}"
 
         # 词性特征
         if tagged_words:
@@ -161,19 +76,11 @@ class MEMM():
             if position < len(tagged_words) - 1:
                 features['next_pos'] = tagged_words[position + 1][1]  # 后一个单词的词性
 
-
-        # 前后窗口特征
-        window_size = 2
-        for i in range(1, window_size + 1):
-            if position - i >= 0:
-                features[f'prev_{i}_word'] = words[position - i].lower()
-            if position + i < len(words):
-                features[f'next_{i}_word'] = words[position + i].lower()
-
         # 前一个标签
         features['prev_label'] = previous_label
 
         return features
+    
     def load_data(self, filename):
         """加载数据并按句号分句"""
         sentences = []
@@ -200,35 +107,48 @@ class MEMM():
                 sentence_labels.append(labels)
         return sentences, sentence_labels
 
+
+
+    def extract_features_for_sentence(self, words, labels):
+        """为单个句子提取特征"""
+        previous_labels = ["O"] + labels
+        tagged_words = pos_tag(words)  # 对句子进行词性标注
+        features = [
+            self.features(words, previous_labels[i], i, tagged_words=tagged_words)
+            for i in range(len(words))
+        ]
+        return features, labels
+
     def train(self):
-        """训练分类器"""
+        """训练分类器，使用多线程提取特征"""
         print('Training classifier...')
         sentences, sentence_labels = self.load_data(self.train_path)
         train_samples = []
-        for words, labels in zip(sentences, sentence_labels):
-            previous_labels = ["O"] + labels
-            tagged_words = pos_tag(words)  # 对句子进行词性标注
-            features = [
-                self.features(words, previous_labels[i], i, tagged_words=tagged_words)
-                for i in range(len(words))
-            ]
+
+        # 使用多线程提取特征
+        with ThreadPoolExecutor() as executor:
+            results = list(executor.map(self.extract_features_for_sentence, sentences, sentence_labels))
+
+        # 整理训练样本
+        for features, labels in results:
             train_samples.extend([(f, l) for (f, l) in zip(features, labels)])
+
         classifier = MaxentClassifier.train(train_samples, max_iter=self.max_iter)
         self.classifier = classifier
 
     def test(self):
-        """测试分类器"""
+        """测试分类器，使用多线程提取特征"""
         print('Testing classifier...')
         sentences, sentence_labels = self.load_data(self.dev_path)
         all_results = []
         all_labels = []
-        for words, labels in zip(sentences, sentence_labels):
-            previous_labels = ["O"] + labels
-            tagged_words = pos_tag(words)  # 对句子进行词性标注
-            features = [
-                self.features(words, previous_labels[i], i, tagged_words=tagged_words)
-                for i in range(len(words))
-            ]
+
+        # 使用多线程提取特征
+        with ThreadPoolExecutor() as executor:
+            results = list(executor.map(self.extract_features_for_sentence, sentences, sentence_labels))
+
+        # 分类并收集结果
+        for features, labels in results:
             results = [self.classifier.classify(n) for n in features]
             all_results.extend(results)
             all_labels.extend(labels)
@@ -241,7 +161,6 @@ class MEMM():
         print("%-15s %.4f\n%-15s %.4f\n%-15s %.4f\n%-15s %.4f\n" % (
             "f_score=", f_score, "accuracy=", accuracy, "recall=", recall, "precision=", precision))
         return True
-    
 
     def show_samples(self, bound):
         """显示所有样本的预测结果"""
@@ -278,49 +197,43 @@ class MEMM():
         """保存模型"""
         with open('./model.pkl', 'wb') as f:
             pickle.dump(self.classifier, f)
-
     def load_model(self):
         """加载模型"""
         with open('./model.pkl', 'rb') as f:
             self.classifier = pickle.load(f)
 
-
-
     def predict_sentence(self, text):
-        """对输入的文本进行命名实体识别，支持多句子"""
+        """对输入的文本进行命名实体识别，支持多句子，并传递两种标签的概率"""
         sentences = sent_tokenize(text)  # 分句
         all_named_entities = []
-
         print("Step-by-step prediction process:")
         for sentence in sentences:
             words = word_tokenize(sentence)  # 使用 NLTK 的 word_tokenize 进行分词
             previous_labels = ["O"]
             tagged_words = pos_tag(words)  # 对句子进行词性标注
-
             features = []
             results = []
             named_entities = []
-
             for i in range(len(words)):
                 # 提取特征
                 feature = self.features(words, previous_labels[i], i, tagged_words=tagged_words)
                 features.append(feature)
-
                 # 分类
-                result = self.classifier.classify(feature)
+                pdist = self.classifier.prob_classify(feature)
+                result = pdist.max()
                 results.append(result)
                 previous_labels.append(result)
-
                 # 如果是命名实体，添加到结果中
                 is_person = result == "PERSON"
-                named_entities.append((words[i], is_person))
-
+                named_entities.append({
+                    'word': words[i],
+                    'is_person': is_person,
+                    'prob_person': pdist.prob("PERSON"),
+                    'prob_other': pdist.prob("O")
+                })      
             # 打印当前句子的人名
             print(f"Sentence: {sentence}")
-            print("Named Entities:", [word for word, is_person in named_entities if is_person])
-
+            print("Named Entities:", [entity['word'] for entity in named_entities if entity['is_person']])
             # 保存当前句子的命名实体结果
             all_named_entities.append(named_entities)
-
         return all_named_entities
-    

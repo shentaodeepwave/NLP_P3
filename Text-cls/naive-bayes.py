@@ -7,55 +7,55 @@ from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 import string
 import os
+from tqdm import tqdm
+import math
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def get_absolute_path(relative_path):
     """将相对路径转换为绝对路径"""
     return os.path.join(ROOT_DIR, relative_path)
 
+import csv  # 添加 CSV 支持
+
 def preprocess(inputfile, outputfile):
-    #TODO: preprocess the input file, and output the result to the output file: train.preprocessed.json,test.preprocessed.json
-    #   Delete the useless symbols
-    #   Convert all letters to the lowercase
-    #   Use NLTK.word_tokenize() to tokenize the sentence
-    #   Use nltk.PorterStemmer to stem the words
+    """预处理 CSV 文件并输出为 JSON 格式"""
     nltk.download('punkt')
     stemmer = PorterStemmer()
     translator = str.maketrans('', '', string.punctuation)
     inputfile = get_absolute_path(inputfile)
     outputfile = get_absolute_path(outputfile)
 
-    with open(inputfile, 'r') as infile:
-        data = json.load(infile)
-
+    label_map = {'1': 'World', '2': 'Sports', '3': 'Business', '4': 'Sci/Tech'}  # 标签映射
     preprocessed_data = []
 
-    for record in data:
-        file_id = record[0]
-        category = record[1]
-        text = record[2]
-        text = text.translate(translator)
-        text = text.lower()
-        tokens = word_tokenize(text)
-        stemmed_tokens = [stemmer.stem(token) for token in tokens]
-        preprocessed_data.append({
-            'file_id': file_id,
-            'category': category,
-            'text': ' '.join(stemmed_tokens)
-        })
-    with open(outputfile, 'w') as outfile:
+    with open(inputfile, 'r', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        for row in reader:
+            label = label_map[row[0]]  # 将标签转换为类别名称
+            text = row[2]  # 第三列为文本
+            text = text.translate(translator)
+            text = text.lower()
+            tokens = word_tokenize(text)
+            stemmed_tokens = [stemmer.stem(token) for token in tokens]
+            preprocessed_data.append({
+                'file_id': row[1],  # 第二列为文件 ID
+                'category': label,
+                'text': ' '.join(stemmed_tokens)
+            })
+
+    with open(outputfile, 'w', encoding='utf-8') as outfile:
         json.dump(preprocessed_data, outfile, indent=4)
-def count_word(inputfile,outputfile):
-    #TODO: count the words from the corpus, and output the result to the output file in the format required.
-    #   A dictionary object may help you with this work.
+
+def count_word(inputfile, outputfile):
+    """统计单词频率并输出到文件"""
     inputfile = get_absolute_path(inputfile)
     outputfile = get_absolute_path(outputfile)
 
-    with open(inputfile, 'r') as infile:
+    with open(inputfile, 'r', encoding='utf-8') as infile:
         data = json.load(infile)
-    
+
     word_counts = {}
-    class_counts = {'crude': 0, 'grain': 0, 'money-fx': 0, 'acq': 0, 'earn': 0}
+    class_counts = {'World': 0, 'Sports': 0, 'Business': 0, 'Sci/Tech': 0}  # 类别名称
 
     for doc in data:
         category = doc['category']
@@ -63,14 +63,14 @@ def count_word(inputfile,outputfile):
         words = doc['text'].split()
         for word in words:
             if word not in word_counts:
-                word_counts[word] = {'crude': 0, 'grain': 0, 'money-fx': 0, 'acq': 0, 'earn': 0}
+                word_counts[word] = {'World': 0, 'Sports': 0, 'Business': 0, 'Sci/Tech': 0}
             word_counts[word][category] += 1
 
-    with open(outputfile, 'w') as outfile:
-        outfile.write(' '.join(str(class_counts[cls]) for cls in ['crude', 'grain', 'money-fx', 'acq', 'earn']) + '\n')
+    with open(outputfile, 'w', encoding='utf-8') as outfile:
+        outfile.write(' '.join(str(class_counts[cls]) for cls in ['World', 'Sports', 'Business', 'Sci/Tech']) + '\n')
         for word, counts in word_counts.items():
-            outfile.write(f"{word} {' '.join(str(counts[cls]) for cls in ['crude', 'grain', 'money-fx', 'acq', 'earn'])}\n")
-    return
+            outfile.write(f"{word} {' '.join(str(counts[cls]) for cls in ['World', 'Sports', 'Business', 'Sci/Tech'])}\n")
+
 def feature_selection(inputfile,threshold,outputfile):
     #TODO: Choose the most frequent 10000 words(defined by threshold) as the feature word
     # Use the frequency obtained in 'word_count.txt' to calculate the total word frequency in each class.
@@ -134,19 +134,20 @@ def calculate_probability(word_count, word_dict, outputfile):
         for word, probabilities in word_probabilities.items():
             outfile.write(f"{word} {' '.join(map(str, probabilities))}\n")
 
-def classify(probability,testset,outputfile):
-    #TODO: Implement the naïve Bayes classifier to assign class labels to the documents in the test set.
-    #   Output the result to the output file in the format required
-
+def classify(probability, testset, outputfile):
+    """实现朴素贝叶斯分类器"""
     probability = get_absolute_path(probability)
     testset = get_absolute_path(testset)
     outputfile = get_absolute_path(outputfile)
 
-    with open(probability, 'r') as prob_file, open(testset, 'r') as test_file:
+    # 读取概率文件
+    with open(probability, 'r') as prob_file:
         prob_lines = prob_file.readlines()
-        test_data = json.load(test_file)
 
+    # 提取先验概率
     prior_probabilities = list(map(float, prob_lines[0].split()))
+
+    # 提取单词的条件概率
     word_probabilities = {}
     for line in prob_lines[1:]:
         parts = line.split()
@@ -154,41 +155,65 @@ def classify(probability,testset,outputfile):
         probabilities = list(map(float, parts[1:]))
         word_probabilities[word] = probabilities
 
+    # 读取测试集
+    test_data = []
+    with open(testset, 'r', encoding='utf-8') as test_file:
+        reader = csv.reader(test_file)
+        for row in reader:
+        
+            file_id = row[1]  # 文件 ID
+            text = row[2]  # 文本内容
+            test_data.append((file_id, text))
+            
+
+    # 分类
+    categories = ['World', 'Sports', 'Business', 'Sci/Tech']
     results = []
-    for doc in test_data:
-        file_id = doc['file_id']
-        words = doc['text'].split()
-        scores = prior_probabilities[:]
-        for word in words:
-            if word in word_probabilities:
-                for i in range(len(scores)):
-                    scores[i] *= word_probabilities[word][i]
-        predicted_class = ['crude', 'grain', 'money-fx', 'acq', 'earn'][scores.index(max(scores))]
-        results.append(f"{file_id} {predicted_class}")
+    for file_id, text in test_data:
+        tokens = word_tokenize(text.lower())
+        scores = prior_probabilities.copy()  # 初始化为先验概率的对数值
+        for i, category in enumerate(categories):
+            for token in tokens:
+                if token in word_probabilities:
+                    scores[i] += math.log(word_probabilities[token][i])  # 使用对数避免下溢
 
-    with open(outputfile, 'w') as outfile:
-        outfile.write('\n'.join(results))
+        # 找到得分最高的类别
+        predicted_category = categories[scores.index(max(scores))]
+        results.append((file_id, predicted_category))
 
-def f1_score(testset,classification_result):
-    #TODO: Use the F_1 score to assess the performance of the implemented classification model
-    #   The return value should be a float object.
+    # 写入分类结果
+    with open(outputfile, 'w', encoding='utf-8') as outfile:
+        for file_id, predicted_category in results:
+            outfile.write(f"{file_id} {predicted_category}\n")
 
+
+def f1_score(testset, classification_result):
+    """计算 F1 分数"""
     testset = get_absolute_path(testset)
     classification_result = get_absolute_path(classification_result)
-    # Load the test set and classification result
-    with open(testset, 'r') as test_file, open(classification_result, 'r') as result_file:
-        test_data = json.load(test_file)
-        results = result_file.readlines()
+    categories = ['World', 'Sports', 'Business', 'Sci/Tech']
+    # 从测试集 CSV 文件读取真实标签
+    true_labels = []
+    with open(testset, 'r', encoding='utf-8') as test_file:
+        reader = csv.reader(test_file)
+        for row in reader:
+            true_labels.append(categories[int(row[0]) - 1])  # 将标签转换为类别名称
 
-    true_labels = {doc[0]: doc[1] for doc in test_data}  
-    predicted_labels = {line.split()[0]: line.split()[1] for line in results}
+    # 从分类结果文件读取预测标签
+    predicted_labels = []
+    with open(classification_result, 'r', encoding='utf-8') as result_file:
+        for line in result_file:
+            predicted_labels.append(line.strip().split(' ')[-1])  # 直接读取预测标签
 
-    tp = {cls: 0 for cls in ['crude', 'grain', 'money-fx', 'acq', 'earn']}
-    fp = {cls: 0 for cls in ['crude', 'grain', 'money-fx', 'acq', 'earn']}
-    fn = {cls: 0 for cls in ['crude', 'grain', 'money-fx', 'acq', 'earn']}
+    
+    tp = {cls: 0 for cls in categories}
+    fp = {cls: 0 for cls in categories}
+    fn = {cls: 0 for cls in categories}
 
-    for file_id, true_label in true_labels.items():
-        predicted_label = predicted_labels.get(file_id, None)
+    for true_label, predicted_label in zip(true_labels, predicted_labels):
+        if true_label not in categories or (predicted_label and predicted_label not in categories):
+            print(f"Warning: Skipping invalid label pair ({true_label}, {predicted_label})")
+            continue
         if predicted_label == true_label:
             tp[true_label] += 1
         else:
@@ -197,7 +222,7 @@ def f1_score(testset,classification_result):
             fn[true_label] += 1
 
     f1_scores = []
-    for cls in tp:
+    for cls in categories:
         precision = tp[cls] / (tp[cls] + fp[cls]) if (tp[cls] + fp[cls]) > 0 else 0
         recall = tp[cls] / (tp[cls] + fn[cls]) if (tp[cls] + fn[cls]) > 0 else 0
         f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
@@ -209,19 +234,25 @@ def accuracy_score(testset, classification_result):
     """计算分类模型的准确率"""
     testset = get_absolute_path(testset)
     classification_result = get_absolute_path(classification_result)
+    categories = ['World', 'Sports', 'Business', 'Sci/Tech']
+    # 从测试集 CSV 文件读取真实标签
+    true_labels = []
+    with open(testset, 'r', encoding='utf-8') as test_file:
+        reader = csv.reader(test_file)
+        for row in reader:
+            true_labels.append(categories[int(row[0]) - 1])  # 将标签转换为类别名称
 
-    # 加载测试集和分类结果
-    with open(testset, 'r') as test_file, open(classification_result, 'r') as result_file:
-        test_data = json.load(test_file)
-        results = result_file.readlines()
+    # 从分类结果文件读取预测标签
+    predicted_labels = []
+    with open(classification_result, 'r', encoding='utf-8') as result_file:
+        for line in result_file:
+            predicted_labels.append(line.strip().split(' ')[-1])  # 直接读取预测标签
 
-    true_labels = {doc[0]: doc[1] for doc in test_data}
-    predicted_labels = {line.split()[0]: line.split()[1] for line in results}
-
-    correct_predictions = sum(1 for file_id in true_labels if true_labels[file_id] == predicted_labels.get(file_id, None))
+    correct_predictions = sum(1 for true_label, predicted_label in zip(true_labels, predicted_labels) if true_label == predicted_label)
     total_predictions = len(true_labels)
 
     return correct_predictions / total_predictions if total_predictions > 0 else 0
+
 
 def main():
     ''' Main Function '''
