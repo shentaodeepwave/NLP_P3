@@ -9,6 +9,7 @@ import string
 import os
 from tqdm import tqdm
 import math
+import random
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def get_absolute_path(relative_path):
@@ -306,6 +307,57 @@ def main():
         accuracy = accuracy_score(testset, classification_result)
         print('The accuracy of the classification result is: ' + str(accuracy))
 
+def preprocess_text():
+    stemmer = PorterStemmer()
+    translator = str.maketrans('', '', string.punctuation)
+    preprocessed_data = []
+    stemmer = PorterStemmer()
+    translator = str.maketrans('', '', string.punctuation)
+
+    with open('./Text_cls/test.csv', 'r', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        random_texts = random.sample(list(reader), 5)  # 随机抽取五条文本
+    label_map = {'1': 'World', '2': 'Sports', '3': 'Business', '4': 'Sci/Tech'}
+    for row in random_texts:
+        label = label_map[row[0]]  # 将标签转换为类别名称
+        text = row[2]  # 第三列为文本
+        text = text.translate(translator)
+        text = text.lower()
+        tokens = word_tokenize(text)
+        stemmed_tokens = [stemmer.stem(token) for token in tokens]
+        preprocessed_data.append({
+            'file_id': row[1],  # 第二列为文件 ID
+            'category': label,
+            'text': row[2],  # 第三列为文本
+            'preprocess_text': ' '.join(stemmed_tokens)  # 添加预处理后的文本
+        })
+    text = [record['text'] for record in preprocessed_data]
+    preprocess_text = [record['preprocess_text'] for record in preprocessed_data]  # 提取预处理后的文本
+    return text, preprocess_text,label
+
+def classify1(probability, input_text):
+    """实现朴素贝叶斯分类器"""
+    with open(probability, 'r') as prob_file:
+        prob_lines = prob_file.readlines()
+
+    prior_probabilities = list(map(float, prob_lines[0].split()))
+    word_probabilities = {}
+    for line in prob_lines[1:]:
+        parts = line.split()
+        word = parts[0]
+        probabilities = list(map(float, parts[1:]))
+        word_probabilities[word] = probabilities
+
+    categories = ['World', 'Sports', 'Business', 'Sci/Tech']
+    tokens = word_tokenize(input_text.lower())
+    scores = prior_probabilities.copy()
+    for i, category in enumerate(categories):
+        for token in tokens:
+            if token in word_probabilities:
+                scores[i] += math.log(word_probabilities[token][i])  # 使用对数避免下溢
+
+    predicted_category = categories[scores.index(max(scores))]
+    return predicted_category, scores  # 返回分类结果和得分
 
 if __name__ == '__main__':
     import os
