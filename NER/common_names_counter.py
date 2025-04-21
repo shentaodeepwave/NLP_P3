@@ -2,6 +2,7 @@
 # -*- coding:utf-8 -*-
 import json
 from collections import Counter
+import matplotlib.pyplot as plt  # 新增导入
 
 def load_data(filename):
     """加载数据"""
@@ -38,12 +39,34 @@ def count_common_names(filename, top_n=100):
     percentage = (top_n_count / total_count) * 100
     print(f"前 {top_n} 个名字的出现次数占总人名数的比例为: {percentage:.2f}%")
     
-    return most_common_names
+    return name_counter
 
 def save_common_names_to_json(common_names, output_file):
     """保存常见名字到 JSON 文件"""
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(dict(common_names), f, ensure_ascii=False, indent=4)
+
+def plot_name_distribution(name_counter, interval=100):
+    """绘制人名分布折线图（纵坐标为累计出现比例）"""
+    sorted_names = name_counter.most_common()
+    counts = [count for _, count in sorted_names]
+    
+    # 计算总出现次数
+    total_count = sum(counts)
+    
+    # 每 interval 个名字统计一次累计出现比例
+    cumulative_counts = [sum(counts[:i]) for i in range(interval, len(counts) + 1, interval)]
+    cumulative_ratios = [count / total_count * 100 for count in cumulative_counts]
+    x_labels = list(range(interval, len(counts) + 1, interval))
+    
+    # 绘制折线图
+    plt.figure(figsize=(10, 6))
+    plt.plot(x_labels, cumulative_ratios, marker='o', linestyle='-', color='b')
+    plt.title("cumulative proportion of occurrences of people's names")
+    plt.xlabel("number of names of people")
+    plt.ylabel("Cumulative percentage of occurrences (%)")
+    plt.grid(True)
+    plt.show()
 
 if __name__ == "__main__":
 
@@ -51,6 +74,9 @@ if __name__ == "__main__":
     output_file = "./common_names.json"
     top_n = 1000
 
-    common_names = count_common_names(train_data_path, top_n)
-    save_common_names_to_json(common_names, output_file)
+    name_counter = count_common_names(train_data_path, top_n)
+    save_common_names_to_json(name_counter.most_common(top_n), output_file)
     print(f"最常见的 {top_n} 个名字已保存到 {output_file}")
+    
+    # 绘制折线图
+    plot_name_distribution(name_counter, interval=100)

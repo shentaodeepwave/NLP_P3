@@ -42,8 +42,6 @@ class MEMM():
         # 使用缓存的词性标注结果
         if tagged_words:
             features[f'pos={tagged_words[position][1]}'] = 1
-        if current_word in common_names:
-            features['is_common_name=1'] = 1
         features[f'length={len(current_word)}'] = 1
         if any(char.isdigit() for char in current_word):
             features['has_digit=1'] = 1

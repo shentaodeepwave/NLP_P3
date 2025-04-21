@@ -10,6 +10,8 @@ from tqdm import tqdm
 from nltk.tokenize import word_tokenize
 from string import punctuation
 from nltk.tokenize import sent_tokenize  # 添加分句所需的模块
+from concurrent.futures import ThreadPoolExecutor
+
 nltk.download('punkt')
 
 # 下载 NLTK 所需的资源
@@ -24,8 +26,6 @@ class MEMM():
         self.beta = 0
         self.max_iter = 0
         self.classifier = None
-        with open('./common_names.json', 'r', encoding='utf-8') as f:
-            self.common_names = set(json.load(f).keys())
 
     def features(self, words, previous_label, position, tagged_words=None):
         """提取特征"""
@@ -52,13 +52,11 @@ class MEMM():
         # 使用缓存的词性标注结果
         if tagged_words:
             features[f'pos={tagged_words[position][1]}'] = 1
-        if current_word in self.common_names:
-            features['is_common_name=1'] = 1
         features[f'length={len(current_word)}'] = 1
         if any(char.isdigit() for char in current_word):
             features['has_digit=1'] = 1
         if any(not char.isalnum() for char in current_word):
-            features['has_special_char=1'] = 1
+            features['has_special_char=1'] = 1 
         return features
     
     def load_data(self, filename):
@@ -87,35 +85,47 @@ class MEMM():
                 sentence_labels.append(labels)
         return sentences, sentence_labels
 
+
+    def extract_features_for_sentence(self, words, labels):
+        """为单个句子提取特征"""
+        previous_labels = ["O"] + labels
+        tagged_words = pos_tag(words)  # 对句子进行词性标注
+        features = [
+            self.features(words, previous_labels[i], i, tagged_words=tagged_words)
+            for i in range(len(words))
+        ]
+        return features
+
     def train(self):
-        """训练分类器"""
+        """训练分类器（多线程版）"""
         print('Training classifier...')
         sentences, sentence_labels = self.load_data(self.train_path)
         train_samples = []
-        for words, labels in zip(sentences, sentence_labels):
-            previous_labels = ["O"] + labels
-            tagged_words = pos_tag(words)  # 对句子进行词性标注
-            features = [
-                self.features(words, previous_labels[i], i, tagged_words=tagged_words)
-                for i in range(len(words))
-            ]
+
+        # 使用多线程提取特征
+        with ThreadPoolExecutor() as executor:
+            results = list(executor.map(self.extract_features_for_sentence, sentences, sentence_labels))
+
+        # 将特征和标签组合成训练样本
+        for features, labels in zip(results, sentence_labels):
             train_samples.extend([(f, l) for (f, l) in zip(features, labels)])
+
         classifier = MaxentClassifier.train(train_samples, max_iter=self.max_iter)
         self.classifier = classifier
 
     def test(self):
-        """测试分类器"""
+        """测试分类器（多线程版）"""
         print('Testing classifier...')
         sentences, sentence_labels = self.load_data(self.dev_path)
         all_results = []
         all_labels = []
-        for words, labels in zip(sentences, sentence_labels):
-            previous_labels = ["O"] + labels
-            tagged_words = pos_tag(words)  # 对句子进行词性标注
-            features = [
-                self.features(words, previous_labels[i], i, tagged_words=tagged_words)
-                for i in range(len(words))
-            ]
+
+        # 使用多线程提取特征
+        with ThreadPoolExecutor() as executor:
+            results = list(executor.map(self.extract_features_for_sentence, sentences, sentence_labels))
+
+        # 分类并收集结果
+        for features, labels in zip(results, sentence_labels):
             results = [self.classifier.classify(n) for n in features]
             all_results.extend(results)
             all_labels.extend(labels)
@@ -128,39 +138,6 @@ class MEMM():
         print("%-15s %.4f\n%-15s %.4f\n%-15s %.4f\n%-15s %.4f\n" % (
             "f_score=", f_score, "accuracy=", accuracy, "recall=", recall, "precision=", precision))
         return True
-    
-
-    def show_samples(self, bound):
-        """显示所有样本的预测结果"""
-        sentences, sentence_labels = self.load_data(self.dev_path)
-        all_words = []
-        all_labels = []
-        all_features = []
-
-        # 遍历所有句子，提取特征和标签
-        for words, labels in zip(sentences, sentence_labels):
-            previous_labels = ["O"] + labels
-            tagged_words = pos_tag(words)  # 对句子进行词性标注
-            features = [
-                self.features(words, previous_labels[i], i, tagged_words=tagged_words)
-                for i in range(len(words))
-            ]
-            all_words.extend(words)
-            all_labels.extend(labels)
-            all_features.extend(features)
-
-        # 获取指定范围的特征
-        (m, n) = bound
-        pdists = self.classifier.prob_classify_many(all_features[m:n])
-
-        print('  Words          P(PERSON)  P(O)\n' + '-' * 40)
-        for (word, label, pdist) in zip(all_words[m:n], all_labels[m:n], pdists):
-            if label == 'PERSON':
-                fmt = '  %-15s *%6.4f   %6.4f'
-            else:
-                fmt = '  %-15s  %6.4f  *%6.4f'
-            print(fmt % (word, pdist.prob('PERSON'), pdist.prob('O')))
-
     def dump_model(self):
         """保存模型"""
         with open('./model.pkl', 'wb') as f:

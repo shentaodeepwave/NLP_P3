@@ -17,8 +17,8 @@ import pickle
 
 class MEMM():
     def __init__(self):
-        self.train_path = "../data/train"
-        self.dev_path = "../data/dev"
+        self.train_path = "./data/train"
+        self.dev_path = "./data/dev"
         self.beta = 0
         self.max_iter = 0
         self.classifier = None
@@ -43,7 +43,10 @@ class MEMM():
 
         #===== TODO: Add your features here =======#
 
-        #...
+        features['word.isupper'] = current_word.isupper()  # 是否全大写
+        features['word.istitle'] = current_word.istitle()  # 是否首字母大写
+        features['word.isalpha'] = current_word.isalpha()   # 是否是字母
+        features['word.numeric'] = current_word.isnumeric()  # 是否是数字
 
         #=============== TODO: Done ================#
         return features
@@ -108,9 +111,9 @@ class MEMM():
             print(fmt % (word, pdist.prob('PERSON'), pdist.prob('O')))
 
     def dump_model(self):
-        with open('../model.pkl', 'wb') as f:
+        with open('./model0.pkl', 'wb') as f:
             pickle.dump(self.classifier, f)
 
     def load_model(self):
-        with open('../model.pkl', 'rb') as f:
+        with open('./model0.pkl', 'rb') as f:
             self.classifier = pickle.load(f)

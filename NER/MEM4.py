@@ -44,6 +44,7 @@ class MEMM():
         features['word.length'] = len(current_word)  # 单词长度
         features['word.has_digit'] = any(char.isdigit() for char in current_word)  # 是否包含数字
         features['word.has_special_char'] = any(not char.isalnum() for char in current_word)  # 是否包含标点符号
+        features['word.has_Apostrophe'] = True if "'" in current_word else False  # 是否包含撇号
         features['word.suffix'] = current_word[-3:] if len(current_word) > 2 else current_word  # 后缀
         features['word.prefix'] = current_word[:3] if len(current_word) > 2 else current_word  # 前缀
 
