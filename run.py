@@ -1,5 +1,5 @@
 import argparse
-from MEM4 import MEMM
+from NER.MEM4 import MEMM
 
 def main():
     classifier = MEMM()
