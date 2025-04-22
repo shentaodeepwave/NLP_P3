@@ -23,9 +23,6 @@ def index():
                            classification_result=None
                            )
 
-
-
-
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
